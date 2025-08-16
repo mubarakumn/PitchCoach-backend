@@ -9,7 +9,7 @@ import { emailSignupSchema, emailLoginSchema, googleSchema } from "../validators
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Utility to generate access & refresh tokens and store hashed refresh token
+ // Utility to generate access & refresh tokens and store hashed refresh token
 const generateTokens = async (userId) => {
   const accessToken = jwt.sign({ id: userId }, process.env.JWT_ACCESS_SECRET, { expiresIn: "15m" });
   const refreshTokenValue = jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: "7d" });
@@ -55,6 +55,7 @@ export const signupEmail = async (req, res) => {
 
 export const loginEmail = async (req, res) => {
   const parsed = emailLoginSchema.safeParse(req.body);
+  
   if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
 
   const { email, password } = parsed.data;
@@ -62,12 +63,12 @@ export const loginEmail = async (req, res) => {
   if (!user || user.authProvider !== "email") return res.status(401).json({ message: "Invalid credentials" });
 
   const ok = await bcrypt.compare(password, user.password || "");
-  if (!ok) return res.status(401).json({ message: "Invalid credentials" });
+  if (!ok) return res.status(401).json({ message: "Invalid credentials" }, ok);
 
   const { accessToken, refreshTokenValue } = await generateTokens(user._id);
   setRefreshCookie(res, refreshTokenValue);
 
-  res.json({ token: accessToken, user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, provider: user.authProvider } });
+  res.status(200).json({ token: accessToken, user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, provider: user.authProvider } });
 };
 
 export const googleSignIn = async (req, res) => {
@@ -91,7 +92,7 @@ export const googleSignIn = async (req, res) => {
   const { accessToken, refreshTokenValue } = await generateTokens(user._id);
   setRefreshCookie(res, refreshTokenValue);
 
-  res.json({ accessToken, user });
+  res.json({ token: accessToken, user });
 };
 
 export const refreshAccessToken = async (req, res) => {
@@ -107,6 +108,12 @@ export const refreshAccessToken = async (req, res) => {
 
   const accessToken = jwt.sign({ id: decoded.id }, process.env.JWT_ACCESS_SECRET, { expiresIn: "15m" });
   res.json({ accessToken });
+};
+
+export const getProfile = async (req, res) => {
+  const user = await User.findById(req.user.id).select("-password");
+  if (!user) return res.status(404).json({ message: "User not found" });
+  res.json(user);
 };
 
 export const logout = async (req, res) => {

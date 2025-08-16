@@ -21,7 +21,7 @@ const sendEmail = async (to, subject, text, html) => {
     html: html || text, // fallback if HTML is not provided
   });
 
-  console.log(`📧 Email sent: ${info.messageId}`);
+  // console.log(`📧 Email sent: ${info.messageId}`);
 };
 
 export default sendEmail;

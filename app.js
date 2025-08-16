@@ -11,8 +11,9 @@ const app = express();
 // Middlewares
 const allowedOrigins = [
   "http://localhost:8080", 
-  "https://pitchcoach.vercel.app"
-];
+  "http://localhost:5000",
+  "https://pitchcoach.vercel.app",
+  ];
 
 app.use(cors({
   origin: function (origin, callback) {

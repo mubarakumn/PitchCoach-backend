@@ -8,7 +8,9 @@ import {
   logout,
   forgotPassword,
   resetPassword,
+  getProfile,
 } from "../controllers/authController.js";
+import { protect } from "../middlewares/auth.js";
 
 const router = express.Router();
 
@@ -18,6 +20,8 @@ router.post("/login", loginEmail);
 
 // Google
 router.post("/google", googleSignIn);
+
+router.get("/profile", protect, getProfile);
 
 // Token refresh & logout
 router.post("/refresh", refreshAccessToken);
