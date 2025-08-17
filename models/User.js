@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    password: { type: String, minlength: 6, select: false }, // only select when needed
+    password: { type: String, minlength: 8, select: false }, // only select when needed
     avatar: { type: String },
     authProvider: { type: String, enum: ["email", "google"], default: "email" },
 
