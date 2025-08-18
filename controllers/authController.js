@@ -163,7 +163,7 @@ export const refreshAccessToken = async (req, res) => {
     setRefreshCookie(res, refreshTokenValue);
     setAccessCookie(res, accessToken);
 
-    return res.json({ message: "Access token refreshed" });
+    return res.json({ "success": true, message: "Access token refreshed" });
   } catch (err) {
     return res.status(401).json({ message: "Invalid or expired refresh token" });
   }
