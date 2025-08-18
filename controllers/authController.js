@@ -122,6 +122,9 @@ export const googleSignIn = async (req, res) => {
       avatar: payload.picture,
       authProvider: "google",
     });
+ } else if (!user.authProvider.includes('google')) {
+      user.authProvider.push('google')
+      await user.save()
  }
 
   const { accessToken, refreshTokenValue } = await generateTokens(user._id);

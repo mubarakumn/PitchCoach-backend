@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, minlength: 8, select: false }, // only select when needed
     avatar: { type: String },
-    authProvider: { type: String, enum: ["email", "google"], default: "email" },
+    authProvider: { type: [String], enum: ["email", "google"], default: ["email"] },
 
     // Password reset fields
     resetPasswordToken: String,
