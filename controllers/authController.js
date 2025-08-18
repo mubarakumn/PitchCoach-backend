@@ -53,7 +53,7 @@ export const signupEmail = async (req, res) => {
   if (await User.findOne({ email })) return res.status(409).json({ message: "Email already in use" });
 
   const hashed = await bcrypt.hash(password, 10);
-  const user = await User.create({ name, email, password: hashed, authProvider: "email" });
+  const user = await User.create({ name, email, password: hashed, authProvider: ["email"] });
 
   const { accessToken, refreshTokenValue } = await generateTokens(user._id);
   setRefreshCookie(res, refreshTokenValue);
@@ -77,7 +77,7 @@ export const loginEmail = async (req, res) => {
   // ✅ force include password if schema has select:false
   const user = await User.findOne({ email }).select("+password");
 
-  if (!user || user.authProvider !== "email") {
+  if (!user || !user.authProvider.includes("email")) {
     return res.status(401).json({ message: "Invalid credentials" });
   }
   const ok = await bcrypt.compare(password, user.password);
@@ -115,17 +115,17 @@ export const googleSignIn = async (req, res) => {
 
   let user = await User.findOne({ email: payload.email });
 
-  if (!user) {
-    user = await User.create({
-      name: payload.name,
-      email: payload.email,
-      avatar: payload.picture,
-      authProvider: "google",
-    });
- } else if (!user.authProvider.includes('google')) {
-      user.authProvider.push('google')
-      await user.save()
- }
+if (!user) {
+  user = await User.create({
+    name: payload.name,
+    email: payload.email,
+    avatar: payload.picture,
+    authProvider: ["google"],   // array
+  });
+} else if (!user.authProvider.includes("google")) {
+  user.authProvider.push("google");
+  await user.save();
+}
 
   const { accessToken, refreshTokenValue } = await generateTokens(user._id);
   setRefreshCookie(res, refreshTokenValue);
