@@ -72,7 +72,7 @@ export const loginEmail = async (req, res) => {
   }
 
   const { email, password } = parsed.data;
-  console.log("Login attempt for email:", email);
+  // console.log("Login attempt for email:", email);
 
   // ✅ force include password if schema has select:false
   const user = await User.findOne({ email }).select("+password");
@@ -80,7 +80,6 @@ export const loginEmail = async (req, res) => {
   if (!user || user.authProvider !== "email") {
     return res.status(401).json({ message: "Invalid credentials" });
   }
-console.log(user.password, password);
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) {
     return res.status(401).json({ message: "Invalid credentials" });
