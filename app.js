@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import { notFound, errorHandler } from "./middlewares/error.js";
 import authRoutes from "./routes/authRoutes.js";
+import fileRoutes from "./routes/fileRoutes.js"
 
 const app = express();
 
@@ -32,6 +33,8 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api", fileRoutes);
+
 
 // Error handling 
 app.use(notFound);

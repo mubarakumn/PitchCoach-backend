@@ -217,7 +217,6 @@ export const logout = async (req, res) => {
 };
 
 
-
 // Forgot Password
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;
