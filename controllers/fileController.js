@@ -3,6 +3,9 @@ import express from "express";
 import crypto from "crypto";
 import cloudinary from "../config/cloudinary.js";
 import File from "../models/fileModel.js";
+import Transcription from "../models/transcriptionModel.js";
+import { addTranscriptionJob } from "../queues/transcriptionQueue.js"; 
+
 import { z } from "zod";
 
 /** 2) Create file record (client sends Cloudinary response here) */
@@ -57,9 +60,10 @@ export const createFiles = async (req, res) => {
     // Optional: enforce allowed types server-side
     if (fileType === "slides" && !["pdf", "ppt", "pptx"].includes((format || "").toLowerCase())) {
       // allow anyway if you want – adjust to your needs
+      return res.status(400).json({ error: "Invalid slides format" });
     }
 
-    const doc = await File.create({
+    const file = await File.create({
       user: req.user.id,
       fileType,
       publicId: public_id,
@@ -72,7 +76,27 @@ export const createFiles = async (req, res) => {
       status: "uploaded",
     });
 
-    res.status(201).json(doc);
+    // Create transcription record (pending state)
+    const transcription = await Transcription.create({
+      fileId: file._id,
+      userId: req.user.id,
+      provider: "assemblyai", 
+      status: "pending",
+    });
+
+    // Link back to file
+    file.transcriptionId = transcription._id;
+    await file.save();
+
+    // 👉 Add to background queue instead of running immediately
+    await addTranscriptionJob(file._id, transcription._id, req.user.id, secure_url);
+
+    res.status(201).json({
+      message: "File uploaded. Transcription job queued.",
+      file,
+      transcription,
+    });
+
   } catch (err) {
     console.error("create file error:", err);
     res.status(500).json({ error: "Failed to save file" });
