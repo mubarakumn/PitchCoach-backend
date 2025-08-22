@@ -48,7 +48,7 @@ const transcriptionSchema = new mongoose.Schema(
     },
     feedbackStatus: {
     type: String,
-    enum: ["pending", "completed", "failed"],
+  enum: ["pending", "processing", "completed", "failed"], 
     default: "pending",
     },
     completedAt: { type: Date },

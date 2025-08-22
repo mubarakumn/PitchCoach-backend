@@ -1,5 +1,8 @@
 import OpenAI from "openai";
-import Transcription from "../models/Transcription.js";
+import dotenv from "dotenv";
+import Transcription from "../../models/transcriptionModel.js";
+
+dotenv.config();
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 

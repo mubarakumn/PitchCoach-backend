@@ -4,7 +4,7 @@ import crypto from "crypto";
 import cloudinary from "../config/cloudinary.js";
 import File from "../models/fileModel.js";
 import Transcription from "../models/transcriptionModel.js";
-import { addTranscriptionJob } from "../queues/transcriptionQueue.js"; 
+import { taskQueue } from "../queues/taskQueue.js";
 
 import { z } from "zod";
 
@@ -88,8 +88,13 @@ export const createFiles = async (req, res) => {
     file.transcriptionId = transcription._id;
     await file.save();
 
-    // 👉 Add to background queue instead of running immediately
-    await addTranscriptionJob(file._id, transcription._id, req.user.id, secure_url);
+    // 👉 add job to ONE queue
+    await taskQueue.add("transcription", {
+      fileId: file._id,
+      transcriptionId: transcription._id,
+      userId: req.user.id,
+      fileUrl: secure_url,
+    });
 
     res.status(201).json({
       message: "File uploaded. Transcription job queued.",

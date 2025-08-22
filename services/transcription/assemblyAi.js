@@ -1,6 +1,11 @@
 import axios from "axios";
+import dotenv from "dotenv";
 
-const ASSEMBLY_API_KEY = process.env.ASSEMBLYAI_API_KEY;
+dotenv.config();
+
+const ASSEMBLY_API_KEY = process.env.ASSEMBLY_API_KEY;
+
+console.log("Using AssemblyAI API key:", ASSEMBLY_API_KEY ? "✅" : "❌");
 
 export const AssemblyAIProvider = {
   startTranscription: async (fileUrl) => {
@@ -25,7 +30,7 @@ export const AssemblyAIProvider = {
         headers: { authorization: ASSEMBLY_API_KEY },
       }
     );
-
+  console.log("check status:", response.data.status);
     return {
       status: response.data.status,
       text: response.data.text,

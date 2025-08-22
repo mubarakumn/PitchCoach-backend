@@ -40,7 +40,7 @@ function setAccessCookie(res, token) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: 1 * 60 * 1000, // 15 minutes
   });
 }
 
@@ -139,10 +139,10 @@ if (!user) {
 export const refreshAccessToken = async (req, res) => {
   try {
     const refreshTokenFromCookie = req.cookies.refreshToken;
+
     if (!refreshTokenFromCookie) {
       return res.status(401).json({ message: "No refresh token provided" });
     }
-
     // Verify refresh token signature
     const decoded = jwt.verify(refreshTokenFromCookie, process.env.JWT_REFRESH_SECRET);
 

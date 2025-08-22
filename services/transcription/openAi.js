@@ -4,12 +4,10 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 
-
 dotenv.config();
 
-const apiKey = process.env.OPENAI_API_KEY
-// console.log(API_KEY);
-const client = new OpenAI({apiKey});
+const apiKey = process.env.OPENAI_API_KEY;
+const client = new OpenAI({ apiKey });
 
 export const OpenAIProvider = {
   startTranscription: async (fileUrl) => {
@@ -25,8 +23,8 @@ export const OpenAIProvider = {
 
     fs.unlinkSync(tempFilePath);
 
-    return { id: null, text: resp.text };
+    return { text: resp.text, id: null, status: "completed" };
   },
 
-  checkStatus: async () => null, // OpenAI is synchronous
+  checkStatus: async () => null, // Not needed for OpenAI
 };
