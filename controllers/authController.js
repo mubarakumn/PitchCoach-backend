@@ -39,8 +39,8 @@ function setAccessCookie(res, token) {
   res.cookie("accessToken", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 1 * 60 * 1000, // 15 minutes
+    sameSite: "none",
+    maxAge: 15 * 60 * 1000, // 15 minutes
   });
 }
 
