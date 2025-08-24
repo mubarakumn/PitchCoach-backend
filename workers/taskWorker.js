@@ -27,6 +27,8 @@ export const worker = new Worker(
       case "transcription": {
         const { fileId, transcriptionId, userId, fileUrl } = job.data;
         console.log(`🎙️ Starting transcription for file ${fileId}`);
+        
+        await job.updateProgress(5); // just started
 
         let t = await Transcription.findById(transcriptionId);
         if (!t) throw new Error(`Transcription ${transcriptionId} not found`);
@@ -35,8 +37,13 @@ export const worker = new Worker(
         await t.save();
 
         try {
+
+          await job.updateProgress(25); // file prepared
+
           // High-level transcribe call (handles polling internally)
           const result = await transcriptionService.transcribe(fileUrl);
+
+          await job.updateProgress(70); // transcription underway
 
           if (result.status === "completed") {
             t.status = "completed";
@@ -44,6 +51,8 @@ export const worker = new Worker(
             t.metadata = result.metadata;
             t.completedAt = new Date();
             await t.save();
+
+            await job.updateProgress(100);
 
             // enqueue feedback job
             await taskQueue.add("feedback", {
@@ -78,21 +87,32 @@ export const worker = new Worker(
         const { transcriptionId } = job.data;
         console.log(`🧑‍🏫 Starting feedback for transcription ${transcriptionId}`);
 
+        await job.updateProgress(5); // just started
+
         const t = await Transcription.findById(transcriptionId);
         if (!t) throw new Error(`Transcription ${transcriptionId} not found`);
 
         try {
+
+          await job.updateProgress(25); // job started
+
           t.feedbackStatus = "processing";
           await t.save();
 
           const result = await analyzeTranscription(transcriptionId);
+         
+          await job.updateProgress(70); // transcription analyzed
 
           if (result.success) {
             t.feedbackStatus = "completed";
             t.feedback = result.feedback;
             t.feedbackAdvice = result.advice;
             await t.save();
+
+            await job.updateProgress(100); // job done
+            
             console.log(`✅ Feedback completed for ${transcriptionId}`);
+          
           } else {
             t.feedbackStatus = "failed";
             t.errorMessage = result.error;

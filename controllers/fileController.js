@@ -59,10 +59,10 @@ export const createFiles = async (req, res) => {
   try {
     // Optional: enforce allowed types server-side
     if (fileType === "slides" && !["pdf", "ppt", "pptx"].includes((format || "").toLowerCase())) {
-      // allow anyway if you want – adjust to your needs
       return res.status(400).json({ error: "Invalid slides format" });
     }
 
+    // 1️⃣ Save file metadata
     const file = await File.create({
       user: req.user.id,
       fileType,
@@ -76,37 +76,38 @@ export const createFiles = async (req, res) => {
       status: "uploaded",
     });
 
-    // Create transcription record (pending state)
+    // 2️⃣ Create a transcription record in DB
     const transcription = await Transcription.create({
       fileId: file._id,
       userId: req.user.id,
-      provider: "assemblyai", 
+      provider: "assemblyai",
       status: "pending",
     });
 
-    // Link back to file
     file.transcriptionId = transcription._id;
     await file.save();
 
-    // 👉 add job to ONE queue
-    await taskQueue.add("transcription", {
+    // 3️⃣ Enqueue transcription job and capture `job`
+    const job = await taskQueue.add("transcription", {
       fileId: file._id,
       transcriptionId: transcription._id,
       userId: req.user.id,
       fileUrl: secure_url,
     });
 
+    // 4️⃣ Return jobId for client progress tracking
     res.status(201).json({
       message: "File uploaded. Transcription job queued.",
       file,
       transcription,
+      jobId: job.id,   // 👈 client will use this to connect to /api/progress/:jobId
     });
 
   } catch (err) {
     console.error("create file error:", err);
     res.status(500).json({ error: "Failed to save file" });
   }
-}
+};
 
 export const listFiles = async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page || "1", 10));

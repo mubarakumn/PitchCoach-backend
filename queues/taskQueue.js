@@ -1,4 +1,4 @@
-import { Queue } from "bullmq";
+import { Queue, QueueEvents } from "bullmq";
 import IORedis from "ioredis";
 import dotenv from "dotenv";
 
@@ -12,3 +12,16 @@ export const connection = new IORedis({
 });
 
 export const taskQueue = new Queue("tasks-queue", { connection });
+export const taskQueueEvents = new QueueEvents("tasks-queue", { connection });
+
+taskQueueEvents.on("progress", ({ jobId, data }) => {
+  console.log(`📊 Job ${jobId} progress:`, data);
+});
+
+taskQueueEvents.on("completed", ({ jobId, returnvalue }) => {
+  console.log(`✅ Job ${jobId} completed`, returnvalue);
+});
+
+taskQueueEvents.on("failed", ({ jobId, failedReason }) => {
+  console.log(`❌ Job ${jobId} failed:`, failedReason);
+});
