@@ -12,7 +12,8 @@ const app = express();
 
 // Middlewares
 const allowedOrigins = [
-  "http://localhost:8081", 
+  "http://localhost:8080", 
+  "http://192.168.43.153:8080", 
   process.env.CLIENT_ORIGIN,
   ];
 

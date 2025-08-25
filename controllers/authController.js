@@ -39,7 +39,7 @@ function setAccessCookie(res, token) {
   res.cookie("accessToken", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "none",
+    sameSite: "strict",
     maxAge: 15 * 60 * 1000, // 15 minutes
   });
 }
@@ -63,7 +63,6 @@ export const signupEmail = async (req, res) => {
     user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, provider: user.authProvider },
   });
 };
-
 
 export const loginEmail = async (req, res) => {
   const parsed = emailLoginSchema.safeParse(req.body);
@@ -104,7 +103,6 @@ export const loginEmail = async (req, res) => {
   });
 };
 
-
 export const googleSignIn = async (req, res) => {
   const parsed = googleSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
@@ -133,8 +131,6 @@ if (!user) {
 
   res.json({ user });
 };
-
-
 
 export const refreshAccessToken = async (req, res) => {
   try {
@@ -171,7 +167,6 @@ export const refreshAccessToken = async (req, res) => {
     return res.status(401).json({ message: "Invalid or expired refresh token" });
   }
 };
-
 
 export const getProfile = async (req, res) => {
   const user = await User.findById(req.user.id).select("-password");
@@ -215,7 +210,6 @@ export const logout = async (req, res) => {
 
   res.json({ message: "Logged out successfully" });
 };
-
 
 // Forgot Password
 export const forgotPassword = async (req, res) => {

@@ -6,39 +6,26 @@ dotenv.config();
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const SYSTEM_PROMPT = `
-You are an expert public-speaking coach and presentation analyst. 
-STRICT RULE: Always begin your response with a valid JSON object that matches the schema below, with no surrounding text, no Markdown fences, no labels. After the JSON, output a single plain-text paragraph of advice.
+function calculateLocalMetrics(text, durationSeconds) {
+  const words = text.trim().split(/\s+/);
+  const totalWords = words.length;
 
-Schema:
-{
-  "summary": "...",
-  "metrics": { "fillerWordsCount": 0, "paceWordsPerMinute": null, "longPauses": 0, "totalWords": 0 },
-  "scores": { "clarity": 0-100, "confidence": 0-100, "engagement": 0-100, "structure": 0-100, "language": 0-100 },
-  "strengths": ["..."],
-  "improvements": ["..."],
-  "suggestions": ["..."],
-  "highlightedExamples": [ { "type": "...", "text": "...", "context": "..." } ]
-}
-`;
+  // Filler words
+  const fillerWords = ["um", "uh", "like", "you know", "so", "actually", "basically"];
+  let fillerCount = 0;
+  words.forEach(w => {
+    if (fillerWords.includes(w.toLowerCase())) fillerCount++;
+  });
 
-function safeJsonParse(rawText) {
-  const jsonMatch = rawText.match(/^\s*({[\s\S]*?})\s*(?:\n|$)/);
-  if (!jsonMatch) return null;
-  try {
-    return JSON.parse(jsonMatch[1]);
-  } catch {
-    const start = rawText.indexOf("{");
-    const last = rawText.lastIndexOf("}");
-    if (start !== -1 && last !== -1 && last > start) {
-      try {
-        return JSON.parse(rawText.slice(start, last + 1));
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
+  // Pace (words per minute)
+  const paceWPM = durationSeconds ? Math.round((totalWords / durationSeconds) * 60) : null;
+
+  return {
+    fillerWordsCount: fillerCount,
+    paceWordsPerMinute: paceWPM,
+    totalWords,
+    longPauses: 0, // could be updated if you capture timestamps
+  };
 }
 
 export async function analyzeTranscription(transcriptionId, opts = {}) {
@@ -47,33 +34,58 @@ export async function analyzeTranscription(transcriptionId, opts = {}) {
   if (!transcription.text?.trim()) throw new Error("No transcription text to analyze");
 
   const duration = transcription.duration || opts.duration || null;
-  const metaNote = duration ? `\n\nMetadata: durationSeconds=${duration}` : "";
+  const metrics = calculateLocalMetrics(transcription.text, duration);
+
+  const SYSTEM_PROMPT = `
+  You are an expert public speaking and pitch coach. 
+  RULES:
+  - Always start with a valid JSON object (schema given).
+  - After the JSON, give a short motivational coaching paragraph.
+  - Always highlight at least 2 strengths first.
+  - Always provide 2-3 specific practice exercises for confidence building.
+  
+  Schema:
+  {
+    "summary": "...",
+    "metrics": ${JSON.stringify(metrics)},
+    "scores": { "clarity": 0-100, "confidence": 0-100, "engagement": 0-100, "structure": 0-100, "language": 0-100 },
+    "strengths": ["..."],
+    "improvements": ["..."],
+    "suggestions": ["..."],
+    "highlightedExamples": [ { "type": "...", "text": "...", "context": "..." } ]
+  }
+  `;
 
   const userPrompt = `
-Analyze the following transcript and produce structured feedback as JSON per the system instructions.
-Transcript:
-""" 
-${transcription.text}
-"""
-${metaNote}
-`;
+  Analyze this transcript for presentation skills and provide feedback.
+  Transcript:
+  """
+  ${transcription.text}
+  """
+  `;
 
   let response;
   try {
     response = await client.responses.create({
-      model: process.env.COACH_MODEL || "gpt-4o",
+      model: process.env.COACH_MODEL || "gpt-4o", // try gpt-4o first
       input: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.2,
-      max_output_tokens: 1200,
+      temperature: 0.3,
+      max_output_tokens: 1000,
     });
   } catch (err) {
-    transcription.feedbackStatus = "failed";
-    transcription.metadata = { ...(transcription.metadata || {}), coachError: err.message };
-    await transcription.save();
-    return { success: false, status: "failed", error: err.message };
+    // fallback to gpt-3.5
+    response = await client.responses.create({
+      model: "gpt-3.5-turbo",
+      input: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.3,
+      max_output_tokens: 1000,
+    });
   }
 
   const rawText = response.output_text || null;
@@ -83,25 +95,27 @@ ${metaNote}
     return { success: false, status: "failed", error: "Empty AI response" };
   }
 
-  const parsedJson = safeJsonParse(rawText);
-  if (!parsedJson) {
-    transcription.feedback = { raw: rawText };
-    transcription.feedbackStatus = "failed";
-    transcription.metadata = { ...(transcription.metadata || {}), coachRaw: rawText };
-    await transcription.save();
-    return { success: false, status: "failed", error: "JSON parse failed", rawText };
+  // Extract JSON
+  const jsonMatch = rawText.match(/^\s*({[\s\S]*?})\s*(?:\n|$)/);
+  let parsedJson = null;
+  if (jsonMatch) {
+    try {
+      parsedJson = JSON.parse(jsonMatch[1]);
+    } catch (err) {
+      parsedJson = null;
+    }
   }
 
-  // Extract human advice (text after JSON)
+  // Extract advice (after JSON)
   const advice = rawText.replace(/^[\s\S]*?}\s*/, "").trim();
 
-  transcription.feedback = parsedJson;
+  transcription.feedback = parsedJson || {};
   transcription.feedbackAdvice = advice;
   transcription.feedbackStatus = "completed";
   transcription.completedAt = new Date();
   transcription.metadata = {
     ...(transcription.metadata || {}),
-    coachModel: process.env.COACH_MODEL || "gpt-4o",
+    coachModel: response.model,
     coachRaw: rawText,
   };
   await transcription.save();
