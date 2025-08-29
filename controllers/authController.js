@@ -28,8 +28,8 @@ const generateTokens = async (userId) => {
 function setRefreshCookie(res, token) {
   res.cookie("refreshToken", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "none",
+    secure: process.env.NODE_ENV === "production", // true only in prod
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", 
     path: "/api/auth/refresh",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
@@ -38,8 +38,8 @@ function setRefreshCookie(res, token) {
 function setAccessCookie(res, token) {
   res.cookie("accessToken", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "none",
+    secure: process.env.NODE_ENV === "production", // true only in prod
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", 
     maxAge: 15 * 60 * 1000, // 15 minutes
   });
 }
@@ -135,7 +135,6 @@ if (!user) {
 export const refreshAccessToken = async (req, res) => {
   try {
     const refreshTokenFromCookie = req.cookies.refreshToken;
-
     if (!refreshTokenFromCookie) {
       return res.status(401).json({ message: "No refresh token provided" });
     }
