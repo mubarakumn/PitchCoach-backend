@@ -1,17 +1,8 @@
 import dotenv from "dotenv";
 import Transcription from "../../models/transcriptionModel.js";
-
-// Load API keys from env
-dotenv.config();
-
-// Import clients
-import OpenAI from "openai";          // OpenAI (gpt-3.5 fallback)
-import Anthropic from "@anthropic-ai/sdk"; // Claude Sonnet 4
 import { GoogleGenerativeAI } from "@google/generative-ai"; // Gemini
 
-// Clients setup
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY });
+dotenv.config();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // ---- Local Metrics Calculation ----
@@ -27,7 +18,6 @@ function calculateLocalMetrics(text, durationSeconds) {
 
   const paceWPM = durationSeconds ? Math.round((totalWords / durationSeconds) * 60) : null;
 
-  // Avg sentence length
   const sentences = text.split(/[.!?]/).filter(s => s.trim().length > 0);
   const avgSentenceLength = sentences.length ? Math.round(totalWords / sentences.length) : 0;
 
@@ -35,7 +25,7 @@ function calculateLocalMetrics(text, durationSeconds) {
     totalWords,
     fillerWordsCount: fillerCount,
     paceWordsPerMinute: paceWPM,
-    longPauses: 0, // requires timestamps for accuracy
+    longPauses: 0,
     avgSentenceLength,
   };
 }
@@ -68,49 +58,10 @@ Schema:
   `;
 }
 
-// ---- Try different providers ----
-async function tryClaude(userPrompt, systemPrompt) {
-  try {
-    const msg = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20240620",
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    });
-    return msg.content[0].text;
-  } catch (err) {
-    console.error("Claude error:", err.message);
-    throw err;
-  }
-}
-
 async function tryGemini(userPrompt, systemPrompt) {
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const result = await model.generateContent([systemPrompt, userPrompt]);
-    return result.response.text();
-  } catch (err) {
-    console.error("Gemini error:", err.message);
-    throw err;
-  }
-}
-
-async function tryOpenAI(userPrompt, systemPrompt) {
-  try {
-    const resp = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 1000,
-    });
-    return resp.choices[0].message.content;
-  } catch (err) {
-    console.error("OpenAI error:", err.message);
-    throw err;
-  }
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+  const result = await model.generateContent([systemPrompt, userPrompt]);
+  return result.response.text();
 }
 
 // ---- Main Analyzer ----
@@ -131,32 +82,22 @@ ${transcription.text}
 """
 `;
 
-  let rawText = null;
-  let usedModel = null;
-
+  let rawText;
   try {
-    // 1. Try Gemini (free tier)
     rawText = await tryGemini(userPrompt, systemPrompt);
-    usedModel = "Gemini Pro";
-  } catch (err1) {
-    try {
-      // 2. Try Claude
-      rawText = await tryClaude(userPrompt, systemPrompt);
-      usedModel = "Claude Sonnet 4";
-    } catch (err2) {
-      // 3. Fallback to OpenAI
-      rawText = await tryOpenAI(userPrompt, systemPrompt);
-      usedModel = "gpt-3.5-turbo";
-    }
+  } catch (err) {
+    console.error("Gemini error:", err.message);
+    transcription.feedbackStatus = "failed";
+    await transcription.save();
+    return { success: false, status: "failed", error: err.message };
   }
 
   if (!rawText) {
     transcription.feedbackStatus = "failed";
     await transcription.save();
-    return { success: false, status: "failed", error: "Empty AI response" };
+    return { success: false, status: "failed", error: "Empty Gemini response" };
   }
 
-  // Parse JSON part
   const jsonMatch = rawText.match(/^\s*({[\s\S]*?})\s*(?:\n|$)/);
   let parsedJson = null;
   if (jsonMatch) {
@@ -164,7 +105,6 @@ ${transcription.text}
       parsedJson = JSON.parse(jsonMatch[1]);
     } catch (err) {
       console.error("JSON parse failed:", err.message);
-      parsedJson = null;
     }
   }
 
@@ -176,7 +116,7 @@ ${transcription.text}
   transcription.completedAt = new Date();
   transcription.metadata = {
     ...(transcription.metadata || {}),
-    coachModel: usedModel,
+    coachModel: "Gemini Pro",
     coachRaw: rawText,
   };
   await transcription.save();
