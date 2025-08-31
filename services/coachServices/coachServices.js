@@ -70,32 +70,47 @@ Schema:
 
 // ---- Try different providers ----
 async function tryClaude(userPrompt, systemPrompt) {
-  const msg = await anthropic.messages.create({
-    model: "claude-3-5-sonnet-20240620",
-    max_tokens: 1000,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  });
-  return msg.content[0].text;
+  try {
+    const msg = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20240620",
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+    return msg.content[0].text;
+  } catch (err) {
+    console.error("Claude error:", err.message);
+    throw err;
+  }
 }
 
 async function tryGemini(userPrompt, systemPrompt) {
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-  const result = await model.generateContent([systemPrompt, userPrompt]);
-  return result.response.text();
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const result = await model.generateContent([systemPrompt, userPrompt]);
+    return result.response.text();
+  } catch (err) {
+    console.error("Gemini error:", err.message);
+    throw err;
+  }
 }
 
 async function tryOpenAI(userPrompt, systemPrompt) {
-  const resp = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ],
-    temperature: 0.3,
-    max_tokens: 1000,
-  });
-  return resp.choices[0].message.content;
+  try {
+    const resp = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.3,
+      max_tokens: 1000,
+    });
+    return resp.choices[0].message.content;
+  } catch (err) {
+    console.error("OpenAI error:", err.message);
+    throw err;
+  }
 }
 
 // ---- Main Analyzer ----
@@ -120,13 +135,16 @@ ${transcription.text}
   let usedModel = null;
 
   try {
+    // 1. Try Gemini (free tier)
     rawText = await tryGemini(userPrompt, systemPrompt);
     usedModel = "Gemini Pro";
   } catch (err1) {
     try {
+      // 2. Try Claude
       rawText = await tryClaude(userPrompt, systemPrompt);
       usedModel = "Claude Sonnet 4";
     } catch (err2) {
+      // 3. Fallback to OpenAI
       rawText = await tryOpenAI(userPrompt, systemPrompt);
       usedModel = "gpt-3.5-turbo";
     }
@@ -144,7 +162,8 @@ ${transcription.text}
   if (jsonMatch) {
     try {
       parsedJson = JSON.parse(jsonMatch[1]);
-    } catch {
+    } catch (err) {
+      console.error("JSON parse failed:", err.message);
       parsedJson = null;
     }
   }
