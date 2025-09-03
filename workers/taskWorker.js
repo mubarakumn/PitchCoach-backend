@@ -54,15 +54,18 @@ export const worker = new Worker(
 
             await job.updateProgress(100);
 
-            // enqueue feedback job
-            await taskQueue.add("feedback", {
-              transcriptionId: t._id,
-              text: t.text,
-              userId,
-              fileId,
-            });
+           // enqueue feedback job
+          const feedbackJob = await taskQueue.add("feedback", {
+            transcriptionId: t._id,
+            text: t.text,
+            userId,
+            fileId,
+          });
 
-            console.log(`✅ Transcription ${t._id} completed`);
+          console.log(`✅ Transcription ${t._id} completed. Feedback job ${feedbackJob.id} queued`);
+
+          return { feedbackJobId: feedbackJob.id, transcriptionId: t._id, fileId };
+
           } else {
             t.status = "failed";
             t.errorMessage = result.error || "Unknown transcription failure";
