@@ -44,7 +44,6 @@ function setAccessCookie(res, token) {
   });
 }
 
-
 export const signupEmail = async (req, res) => {
   const parsed = emailSignupSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
@@ -171,6 +170,39 @@ export const getProfile = async (req, res) => {
   const user = await User.findById(req.user.id).select("-password");
   if (!user) return res.status(404).json({ message: "User not found" });
   res.json(user);
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, email, orgRole, company, preferences } = req.body;
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Update fields
+    if (name) user.name = name;
+    if (email) user.email = email;
+    if (orgRole) user.orgRole = orgRole;
+    if (company) user.company = company;
+    if (preferences) user.preferences = preferences;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        orgRole: user.orgRole,
+        company: user.company,
+        preferences: user.preferences,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 export const logout = async (req, res) => {

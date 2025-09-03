@@ -4,18 +4,36 @@ const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    password: { type: String, minlength: 8, select: false }, // only select when needed
+    password: { type: String, minlength: 8, select: false },
     avatar: { type: String },
     authProvider: { type: [String], enum: ["email", "google"], default: ["email"] },
 
-    // Password reset fields
+    Role: { 
+      type: String, 
+      enum: ["user", "admin"], 
+      default: "user" 
+    },
+
+    // Organization role (business/job position)
+    orgRole: { type: String, trim: true },   // e.g. "Software Engineer", "Marketing Lead"
+    company: { type: String, trim: true },
+
+    // Preferences
+    preferences: {
+      theme: { type: String, enum: ["dark", "light", "system"], default: "dark" },
+      language: { type: String, enum: ["en", "es", "fr", "de"], default: "en" },
+      notifications: { type: Boolean, default: true },
+      emailUpdates: { type: Boolean, default: true },
+    },
+
+    // Password reset
     resetPasswordToken: String,
     resetPasswordExpire: Date,
   },
   { timestamps: true }
 );
 
-// Optional: method to remove password & sensitive data from JSON responses
+// Strip sensitive fields from JSON
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;

@@ -9,6 +9,7 @@ import {
   forgotPassword,
   resetPassword,
   getProfile,
+  updateProfile,
 } from "../controllers/authController.js";
 import { protect } from "../middlewares/auth.js";
 
@@ -22,6 +23,8 @@ router.post("/login", loginEmail);
 router.post("/google", googleSignIn);
 
 router.get("/profile", protect, getProfile);
+router.put("/profile", protect, updateProfile);
+
 
 // Token refresh & logout
 router.post("/refresh", refreshAccessToken);
