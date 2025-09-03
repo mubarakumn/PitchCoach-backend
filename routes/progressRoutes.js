@@ -12,6 +12,7 @@ router.get("/progress/:jobId", async (req, res) => {
 
   const jobId = req.params.jobId;
 
+  // 🔹 Progress updates
   const onProgress = ({ jobId: jid, data }) => {
     if (jid === jobId) {
       res.write(`event: progress\n`);
@@ -19,20 +20,33 @@ router.get("/progress/:jobId", async (req, res) => {
     }
   };
 
-  const onComplete = ({ jobId: jid }) => {
+  // 🔹 Job completed
+  const onComplete = ({ jobId: jid, returnvalue }) => {
     if (jid === jobId) {
       res.write(`event: complete\n`);
-      res.write(`data: "done"\n\n`);
+      res.write(`data: ${JSON.stringify(returnvalue)}\n\n`);
+      res.end();
+    }
+  };
+
+  // 🔹 Job failed
+  const onFailed = ({ jobId: jid, failedReason }) => {
+    if (jid === jobId) {
+      res.write(`event: failed\n`);
+      res.write(`data: ${JSON.stringify({ error: failedReason })}\n\n`);
       res.end();
     }
   };
 
   taskQueueEvents.on("progress", onProgress);
   taskQueueEvents.on("completed", onComplete);
+  taskQueueEvents.on("failed", onFailed);
 
+  // Cleanup on disconnect
   req.on("close", () => {
     taskQueueEvents.off("progress", onProgress);
     taskQueueEvents.off("completed", onComplete);
+    taskQueueEvents.off("failed", onFailed);
   });
 });
 

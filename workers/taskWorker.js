@@ -11,10 +11,6 @@ dotenv.config();
 await mongoose.connect(process.env.MONGO_URI);
 console.log("✅ MongoDB connected (TasksWorker)");
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 export const worker = new Worker(
   "tasks-queue",
   async (job) => {
@@ -27,8 +23,6 @@ export const worker = new Worker(
       case "transcription": {
         const { fileId, transcriptionId, userId, fileUrl } = job.data;
         console.log(`🎙️ Starting transcription for file ${fileId}`);
-        
-        await job.updateProgress(5); // just started
 
         let t = await Transcription.findById(transcriptionId);
         if (!t) throw new Error(`Transcription ${transcriptionId} not found`);
@@ -37,13 +31,12 @@ export const worker = new Worker(
         await t.save();
 
         try {
+          await job.updateProgress({ progress: 25, stage: "preparing" });
 
-          await job.updateProgress(25); // file prepared
-
-          // High-level transcribe call (handles polling internally)
+          // Call transcription service
           const result = await transcriptionService.transcribe(fileUrl);
 
-          await job.updateProgress(70); // transcription underway
+          await job.updateProgress({ progress: 70, stage: "transcribing" });
 
           if (result.status === "completed") {
             t.status = "completed";
@@ -52,20 +45,19 @@ export const worker = new Worker(
             t.completedAt = new Date();
             await t.save();
 
-            await job.updateProgress(100);
+            await job.updateProgress({ progress: 100, stage: "transcription_completed" });
 
-           // enqueue feedback job
-          const feedbackJob = await taskQueue.add("feedback", {
-            transcriptionId: t._id,
-            text: t.text,
-            userId,
-            fileId,
-          });
+            // enqueue feedback job
+            const feedbackJob = await taskQueue.add("feedback", {
+              transcriptionId: t._id,
+              text: t.text,
+              userId,
+              fileId,
+            });
 
-          console.log(`✅ Transcription ${t._id} completed. Feedback job ${feedbackJob.id} queued`);
+            console.log(`✅ Transcription ${t._id} completed. Feedback job ${feedbackJob.id} queued`);
 
-          return { feedbackJobId: feedbackJob.id, transcriptionId: t._id, fileId };
-
+            return { feedbackJobId: feedbackJob.id, transcriptionId: t._id, fileId };
           } else {
             t.status = "failed";
             t.errorMessage = result.error || "Unknown transcription failure";
@@ -78,7 +70,6 @@ export const worker = new Worker(
           await t.save();
           throw err;
         }
-        break;
       }
 
       /**
@@ -90,21 +81,20 @@ export const worker = new Worker(
         const { transcriptionId } = job.data;
         console.log(`🧑‍🏫 Starting feedback for transcription ${transcriptionId}`);
 
-        await job.updateProgress(5); // just started
+        await job.updateProgress({ progress: 5, stage: "analyzing" });
 
         const t = await Transcription.findById(transcriptionId);
         if (!t) throw new Error(`Transcription ${transcriptionId} not found`);
 
         try {
-
-          await job.updateProgress(25); // job started
+          await job.updateProgress({ progress: 25, stage: "ai_processing" });
 
           t.feedbackStatus = "processing";
           await t.save();
 
           const result = await analyzeTranscription(transcriptionId);
-         
-          await job.updateProgress(70); // transcription analyzed
+
+          await job.updateProgress({ progress: 70, stage: "generating_feedback" });
 
           if (result.success) {
             t.feedbackStatus = "completed";
@@ -112,10 +102,9 @@ export const worker = new Worker(
             t.feedbackAdvice = result.advice;
             await t.save();
 
-            await job.updateProgress(100); // job done
-            
+            await job.updateProgress({ progress: 100, stage: "feedback_completed" });
+
             console.log(`✅ Feedback completed for ${transcriptionId}`);
-          
           } else {
             t.feedbackStatus = "failed";
             t.errorMessage = result.error;
@@ -128,7 +117,6 @@ export const worker = new Worker(
           await t.save();
           throw err;
         }
-        break;
       }
 
       default:
