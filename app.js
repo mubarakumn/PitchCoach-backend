@@ -7,6 +7,10 @@ import { notFound, errorHandler } from "./middlewares/error.js";
 import authRoutes from "./routes/authRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js"
 import progressRoutes from "./routes/progressRoutes.js";
+import feedbackRoutes from "./routes/feedbackRoutes.js";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 
@@ -37,6 +41,8 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 app.use("/api/auth", authRoutes);
 app.use("/api", fileRoutes);
 app.use("/api", progressRoutes);
+app.use("/api/feedback", feedbackRoutes);
+
 
 
 
